@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<link rel="stylesheet" href="css/style.css">
+
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>一人旅実況</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.5.1/gsap.min.js"></script>
+    <style>
+        #output li {
+            background: #f8c099;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="title_image">
+        <img src="img/title.png" alt="旅イメージ">
+    </div>
+    <br>
+    <br>
+    <div class="bg_pattern ZigZag"></div>
+
+    </div>
+    <!--WEBカメラの映像を表示 -->
+    <video id="video" width="800" height="480" autoplay></video>
+    <!-- <canvas id="canvas" width="640" height="480"></canvas> -->
+    <!--ニコニコ動画風のコメント表示 -->
+
+    <button id="button01"> チャットを流す</button>
+
+    <h2>一人旅実況</h2>
+
+    <form>
+        <fieldset>
+            <legend>チャット入力画面</legend>
+            <div>
+                name: <input type="text" id="name">
+            </div>
+            <div>
+                text: <input type="text" id="text">
+            </div>
+            <div>
+                <button type="button" id="send">send</button>
+            </div>
+        </fieldset>
+    </form>
+
+
+    <script>
+        // WEBカメラの映像を表示
+        var video = document.getElementById('video');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true }).then(function (stream) {
+                video.srcObject = stream;
+                video.play();
+            });
+        }
+    </script>
+    <script>
+        // ニコニコ動画風のコメント表示
+        const button01 = document.getElementById("button01");
+        button01.addEventListener("click", function () { createText() }, false);
+        let count = 0;
+
+        async function createText() {
+            let div_text = document.createElement('div');
+            div_text.id = "text" + count; //アニメーション処理で対象の指定に必要なidを設定
+            count++;
+            div_text.style.position = 'fixed'; //テキストのは位置を絶対位置にするための設定
+            div_text.style.whiteSpace = 'nowrap' //画面右端での折り返しがなく、画面外へはみ出すようにする
+            div_text.style.left = (document.documentElement.clientWidth) + 'px'; //初期状態の横方向の位置は画面の右端に設定
+            var random = Math.round(Math.random() * document.documentElement.clientHeight);
+            div_text.style.top = random + 'px';  //初期状態の縦方向の位置は画面の上端から下端の間に設定（ランダムな配置に）
+            div_text.appendChild(document.createTextNode('すごい' + count)); //画面上に表示されるテキストを設定
+            document.body.appendChild(div_text); //body直下へ挿入
+
+            //ライブラリを用いたテキスト移動のアニメーション： durationはアニメーションの時間、
+            //        横方向の移動距離は「画面の横幅＋画面を流れるテキストの要素の横幅」、移動中に次の削除処理がされないようawait
+            await gsap.to("#" + div_text.id, { duration: 5, x: -1 * (document.documentElement.clientWidth + div_text.clientWidth) });
+
+            div_text.parentNode.removeChild(div_text); //画面上の移動終了後に削除
+        }
+    </script>
+
+    <ul id="output"></ul>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script>
+        // 日時をいい感じの形式にする関数
+        function convertTimestampToDatetime(timestamp) {
+            const _d = timestamp ? new Date(timestamp * 1000) : new Date();
+            const Y = _d.getFullYear();
+            const m = (_d.getMonth() + 1).toString().padStart(2, '0');
+            const d = _d.getDate().toString().padStart(2, '0');
+            const H = _d.getHours().toString().padStart(2, '0');
+            const i = _d.getMinutes().toString().padStart(2, '0');
+            const s = _d.getSeconds().toString().padStart(2, '0');
+            return `${Y}/${m}/${d} ${H}:${i}:${s}`;
+        }
+    </script>
+    <!-- 以下にfirebaseのコードを貼り付けよう -->
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-app.js";
+
+        import {
+            getFirestore,
+            collection,
+            addDoc,
+            serverTimestamp,
+            query,
+            orderBy,
+            onSnapshot,
+        } from "https://www.gstatic.com/firebasejs/9.14.0/firebase-firestore.js";
+
+
+        const firebaseConfig = {
+            authDomain: "tabi-me.firebaseapp.com",
+            projectId: "tabi-me",
+            storageBucket: "tabi-me.appspot.com",
+            messagingSenderId: "232496793034",
+            appId: "1:232496793034:web:c1691ff44feb9882013b33"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+
+        const db = getFirestore(app);
+
+        $("#send").on("click", function () {
+            // chatapp.html
+
+            const postData = {
+                name: $("#name").val(),
+                text: $("#text").val(),
+                time: serverTimestamp(),
+            };
+            addDoc(collection(db, "chat"), postData);
+            $("#text").val("");
+
+        });
+
+
+        const q = query(collection(db, "chat"), orderBy("time", "desc"));
+
+        onSnapshot(q, (querySnapshot) => {
+
+            // データの変更があった時にここの処理が動く
+            // console.log(querySnapshot.docs);
+
+            // 毎回同じ
+            const documents = [];
+            querySnapshot.docs.forEach(function (doc) {
+                const document = {
+                    id: doc.id,
+                    data: doc.data(),
+                };
+                documents.push(document);
+            });
+
+            // ただのオブジェクトが入った配列
+            console.log(documents);
+
+            const htmlElements = [];
+            documents.forEach(function (document) {
+                htmlElements.push(`
+        <li id="${document.id}">
+          <p>${document.data.name
+                    } at ${convertTimestampToDatetime(document.data.time.seconds)}</p>
+          <p>${document.data.text}</p>
+        </li>
+      `);
+            });
+
+            $("#output").html(htmlElements);
+
+        });
+
+    </script>
+</body>
+
+</html>
+
+
+</script>
+
+</body>
+
+</html>
